@@ -1,4 +1,4 @@
-# Gerenciador de Quadra de Vôlei
+# Gerenciador de Quadra
 
 Este é um projeto de aplicação web para gerenciar e organizar jogos em uma quadra. A ferramenta foi desenvolvida para ajudar a formar times e gerenciar a fila de próximos, registrar placares e manter um histórico persistente de vitórias e derrotas de jogadores e times.
 
