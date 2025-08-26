@@ -2,6 +2,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open('gerenciador-quadra-v1').then((cache) => {
       return cache.addAll([
+        '/',
         '/index.html',
         '/assets/css/bootstrap-icons.css',
         '/assets/css/bootstrap.min.css',
