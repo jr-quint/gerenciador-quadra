@@ -589,3 +589,14 @@ document.getElementById('retorno-automatico-descanso').addEventListener('change'
 document.getElementById('mover-proximo-automatico').addEventListener('change', moverProximoQuadraAutomatico);
 document.getElementById('primeiro-fila-proximo').addEventListener('change', moverPrimeiroDaFilaParaProximo);
 document.getElementById('ativar-notificacoes').addEventListener('change', salvarDados);
+
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').then((registration) => {
+      console.log('Service Worker registrado com sucesso:', registration);
+    }).catch((error) => {
+      console.log('Erro ao registrar o Service Worker:', error);
+    });
+  });
+}
