@@ -204,6 +204,8 @@ function vitoriasParaDescanso() {
 }
 
 function atualizarPlacaresGlobal() {
+    criarRanking()
+    criarRankingTimes()
     elementDescansoAzul.innerHTML = `${quadra.getVitoriasAzul()}/${config.limiteVitorias}`;
     elementDescansoVerde.innerHTML = `${quadra.getVitoriasVerde()}/${config.limiteVitorias}`;
     elementVitoriaAzul.innerHTML = quadra.getTimeAzul().getVitorias();
@@ -323,14 +325,23 @@ function registrarVitoriaTimeVerde() {
     quadra.getTimeVerde().addVitoria();
     quadra.addVitoriaVerde();
 
-    const jogadoresVerde = quadra.getTimeVerde().getJogadores();
-    jogadoresVerde.forEach(j => j.addVitoria());
+    quadra.getTimeVerde().getJogadores().forEach(jogador => {
+        jogador.addVitoria();
+        db.salvarJogador(jogador);
+    });
 
     const timeAzul = quadra.removeTimeAzul();
     timeAzul.getJogadores().forEach(jogador => {
         jogador.addDerrota();
         quadra.getFilaEspera().addJogador(jogador);
+        db.salvarJogador(jogador);
     });
+
+    db.registrarVitoriaTime({
+        nomeTime: quadra.getTimeVerde().getNome(),
+        jogadores: quadra.getTimeVerde().getJogadores().map(j => j.getNome())
+    });
+
     moverVerdeParaDescanso();
     mostrarNotificacao(notificacao.class.sucesso, notificacao.mensagem.sucesso.vitoriaVerdeRegistrada);
 }
@@ -339,14 +350,23 @@ function registrarVitoriaTimeAzul() {
     quadra.getTimeAzul().addVitoria();
     quadra.addVitoriaAzul();
 
-    const jogadoresAzul = quadra.getTimeAzul().getJogadores();
-    jogadoresAzul.forEach(j => j.addVitoria());
+    quadra.getTimeAzul().getJogadores().forEach(jogador => {
+        jogador.addVitoria();
+        db.salvarJogador(jogador);
+    });
 
     const timeVerde = quadra.removeTimeVerde();
     timeVerde.getJogadores().forEach(jogador => {
         jogador.addDerrota();
+        db.salvarJogador(jogador);
         quadra.getFilaEspera().addJogador(jogador);
     });
+
+    db.registrarVitoriaTime({
+        nomeTime: quadra.getTimeAzul().getNome(),
+        jogadores: quadra.getTimeAzul().getJogadores().map(j => j.getNome())
+    });
+
     moverAzulParaDescanso();
     mostrarNotificacao(notificacao.class.sucesso, notificacao.mensagem.sucesso.vitoriaAzulRegistrada);
 }
@@ -412,6 +432,80 @@ function moverDescansoTime() {
 }
 
 
+// RANKINGS
+async function criarRanking() {
+    const jogadoresUnicos = await db.carregarTodosJogadores();
+
+    // Ordena os jogadores por número de vitórias (do maior para o menor)
+    jogadoresUnicos.sort((a, b) => {
+        // Classificação principal: número de vitórias
+        if (b.vitorias !== a.vitorias) {
+            return b.vitorias - a.vitorias;
+        }
+        // Critério de desempate: quem tem menos derrotas fica na frente
+        return a.derrotas - b.derrotas;
+    });
+
+    // Cria a lista de ranking na UI
+    const rankingList = document.getElementById('lista-ranking');
+    rankingList.innerHTML = '';
+
+    jogadoresUnicos.forEach((jogador, index) => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item';
+        li.innerHTML = `
+            ${index + 1}. <strong>${jogador.nome}</strong><br>
+            <small>Vitórias: ${jogador.vitorias} | Derrotas: ${jogador.derrotas}
+        </small>`;
+        rankingList.appendChild(li);
+    });
+}
+
+async function criarRankingTimes() {
+    const historico = await db.carregarHistoricoVitorias();
+    const ranking = {};
+
+    historico.forEach(vitoria => {
+        // Cria um identificador único para a equipe, ordenando os nomes dos jogadores
+        const jogadoresOrdenados = vitoria.jogadores.sort().join(', ');
+
+        if (!ranking[jogadoresOrdenados]) {
+            ranking[jogadoresOrdenados] = {
+                vitorias: 0,
+                jogadores: vitoria.jogadores // Salva a lista original de jogadores
+            };
+        }
+        ranking[jogadoresOrdenados].vitorias++;
+    });
+
+    // Converte o objeto para um array para poder ordenar
+    const rankingArray = Object.keys(ranking).map(key => ({
+        jogadores: ranking[key].jogadores,
+        vitorias: ranking[key].vitorias
+    }));
+
+    // Ordena os times por número de vitórias
+    rankingArray.sort((a, b) => b.vitorias - a.vitorias);
+
+    // Exibe o ranking na tela
+    const rankingList = document.getElementById('lista-ranking-times');
+    rankingList.innerHTML = '';
+
+    rankingArray.forEach((time, index) => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item';
+
+        const jogadoresHTML = time.jogadores.join(', ');
+
+        li.innerHTML = `
+            ${index + 1}. Vitórias: ${time.vitorias}<br>
+            <small>Jogadores: ${jogadoresHTML}</small>
+        `;
+        rankingList.appendChild(li);
+    });
+}
+
+
 // Funções de salvamento e carregamento
 async function salvarDados() {
     const dados = quadra.serializar();
@@ -433,7 +527,12 @@ async function carregarDados() {
         quadra.desserializar(dadosCarregados);
         const configUI = dadosCarregados.config;
 
-        // Atualiza a UI com os dados carregados
+        const jogadoresSalvos = await db.carregarTodosJogadores();
+        jogadoresSalvos.forEach(j => {
+            // Isso é opcional, mas garante que os objetos Jogador tenham os dados corretos
+            // Se você não for usar os dados em tempo real, pode pular
+        });
+
         if (configUI) {
             document.getElementById('inputJogadoresPorTime').value = configUI.limiteJogadoresPorTime;
             document.getElementById('ativar-descanso').checked = configUI.ativarDescanso;
@@ -450,7 +549,6 @@ async function carregarDados() {
         atualizarPlacaresGlobal();
         atualizarListaTimes();
     } else {
-        // Se não houver dados salvos, inicializa as listas e configurações
         atualizarConfigJogadores();
         atualizarListaTimes();
         toggleDescanso();
@@ -458,14 +556,12 @@ async function carregarDados() {
     }
 }
 
-// Adicione esta nova função de resetar
 async function resetarAplicativo() {
     if (confirm("Tem certeza que deseja resetar todos os dados? Esta ação é irreversível.")) {
         await db.resetarDados();
-        window.location.reload(); // Recarrega a página para recriar o banco de dados
+        window.location.reload();
     }
 }
-
 
 document.getElementById("nome-jogador").addEventListener("keydown", function(e) {
     if (e.key === "Enter") {
@@ -482,6 +578,8 @@ document.getElementById('btnTimeAzul').addEventListener('click', () => { btnVito
 document.getElementById('btnProximoTime').addEventListener('click', (event) => { btnMoverProximoTime(event.target.id); });
 document.getElementById('btnDescansoTime').addEventListener('click', (event) => { btnMoverProximoTime(event.target.id); });
 
+// document.getElementById('btn-ranking').addEventListener('click', criarRanking);
+// document.getElementById('btn-ranking-times').addEventListener('click', criarRankingTimes);
 document.getElementById('btn-reset').addEventListener('click', resetarAplicativo);
 document.getElementById('adicionar-btn').addEventListener('click', adicionarJogador);
 document.getElementById('inputJogadoresPorTime').addEventListener('change', atualizarConfigJogadores);

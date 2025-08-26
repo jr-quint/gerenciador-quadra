@@ -11,8 +11,20 @@ export default class Database {
 
             request.onupgradeneeded = (event) => {
                 this.db = event.target.result;
-                this.db.createObjectStore('dadosQuadra', { keyPath: 'id' });
+
+                if (!this.db.objectStoreNames.contains('dadosQuadra')) {
+                    this.db.createObjectStore('dadosQuadra', { keyPath: 'id' });
+                }
+
+                if (!this.db.objectStoreNames.contains('vitoriasTimes')) {
+                    this.db.createObjectStore('vitoriasTimes', { autoIncrement: true });
+                }
+
+                if (!this.db.objectStoreNames.contains('jogadores')) {
+                    this.db.createObjectStore('jogadores', { keyPath: 'nome' });
+                }
             };
+
 
             request.onsuccess = (event) => {
                 this.db = event.target.result;
@@ -86,4 +98,90 @@ export default class Database {
             };
         });
     }
+
+    async salvarJogador(jogador) {
+        if (!this.db) {
+            await this.abrirConexao();
+        }
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['jogadores'], 'readwrite');
+            const store = transaction.objectStore('jogadores');
+            const request = store.put({
+                nome: jogador.getNome(),
+                vitorias: jogador.getVitoria(),
+                derrotas: jogador.getDerrota()
+            });
+
+            request.onsuccess = () => {
+                resolve();
+            };
+
+            request.onerror = (event) => {
+                console.error("Erro ao salvar jogador:", event.target.error);
+                reject(event.target.error);
+            };
+        });
+    }
+
+    async carregarTodosJogadores() {
+        if (!this.db) {
+            await this.abrirConexao();
+        }
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['jogadores'], 'readonly');
+            const store = transaction.objectStore('jogadores');
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                resolve(request.result);
+            };
+
+            request.onerror = (event) => {
+                console.error("Erro ao carregar todos os jogadores:", event.target.error);
+                reject(event.target.error);
+            };
+        });
+    }
+
+    async registrarVitoriaTime(dadosVitoria) {
+        if (!this.db) {
+            await this.abrirConexao();
+        }
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['vitoriasTimes'], 'readwrite');
+            const store = transaction.objectStore('vitoriasTimes');
+            const request = store.add(dadosVitoria);
+
+            request.onsuccess = () => {
+                resolve();
+            };
+
+            request.onerror = (event) => {
+                console.error("Erro ao registrar vitória do time:", event.target.error);
+                reject(event.target.error);
+            };
+        });
+    }
+
+    async carregarHistoricoVitorias() {
+        if (!this.db) {
+            await this.abrirConexao();
+        }
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['vitoriasTimes'], 'readonly');
+            const store = transaction.objectStore('vitoriasTimes');
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                resolve(request.result);
+            };
+
+            request.onerror = (event) => {
+                console.error("Erro ao carregar histórico de vitórias:", event.target.error);
+                reject(event.target.error);
+            };
+        });
+    }
+
+
 }
